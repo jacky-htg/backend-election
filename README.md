@@ -1,7 +1,15 @@
-# Go REST API Skeleton
-A robust and scalable RESTful API skeleton built with Go, featuring essential tools and practices for modern web applications.
+# Backend Election
+A backend for election system built with Go.
 
-## Features
+## Business Features
+- Authentication & Authorization
+- Voter Registration
+- Candidat Registration
+- Vote Transaction
+- Get Eletion Result
+- Manage Peer Registration
+
+## Technical Features
 - Concurrency Limit: Control the maximum number of concurrent requests.
 - Rate Limiter: Protect your API from abuse by limiting request rates.
 - JWT Authentication: Secure your API with JSON Web Tokens.
@@ -18,14 +26,9 @@ A robust and scalable RESTful API skeleton built with Go, featuring essential to
 - Database Migrations: Version control your database schema.
 - API Testing: Ensure your API functions as expected.
 - Swagger Documentation: Auto-generate API documentation for easy reference.
-- Log Monitoring with Loki: Monitor logs efficiently.
-- Tracing with OpenTelemetry: Track and analyze performance with Jaeger and otel-collector.
-- Business Metrics with OpenTelemetry: Collect metrics relevant to business logic.
-- Common Golang Metrics with Prometheus: Utilize Prometheus for golang server metrics.
 - Idempotent Request Handling: Ensure repeated requests yield the same result.
 - Docker Support: Pre-configured Dockerfile for easy deployment.
-- CI/CD Integration with GitHub Actions: Streamline your deployment process.
-- Example CRUD Operations: Included examples for user management and authentication.
+- Matching Bimetric Fingerprint
 
 ## Getting Started
 ### Prerequisites
@@ -37,8 +40,8 @@ A robust and scalable RESTful API skeleton built with Go, featuring essential to
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/go-rest-api-skeleton.git
-cd go-rest-api-skeleton
+git clone https://github.com/jacky-htg/backend-election.git
+cd backend-election
 ```
 
 2. Install dependencies:
@@ -49,16 +52,14 @@ go mod tidy
 
 3. Create a .env file or set environment variables based on the provided configuration template.
 
-4. run `cd docker && docker-compose up -d` to running monitoring tools.
-
-5. Run the application: From your root app directory, run the command:
+4. Run the application: From your root app directory, run the command:
 
 ```bash
 go run main.go
 ```
 
 ### API Documentation
-API documentation is automatically generated and can be accessed at http://localhost:8081/swagger/doc.json.
+API documentation is automatically generated and can be accessed at http://localhost:port/swagger/doc.json.
 
 if you want to login using seed data, you can try with this payload:
 ```json
@@ -74,7 +75,6 @@ The folder structure is organized to follow the principles of Clean Architecture
 ```bash
 go-rest-api-skeleton/
 ├── cmd/                # CLI command for migration and etc
-├── docker/             # docker configuration
 ├── docs/               # Generated APi Doc for Swagger
 ├── internal/           # Application internals (domain logic, services)
 │   ├── dto/            # Data transfer object to transform request into model and transform model into response
@@ -99,21 +99,20 @@ To create a new API endpoint, follow these steps:
 
 1. Define the Model: Create a new model in the internal/model directory representing your data structure.
 
-Example: `internal/model/product.go`
+Example: `internal/model/candidate.go`
 
 ```go
 package model
 
-type Product struct {
+type Candidate struct {
     ID    int     `json:"id"`
     Name  string  `json:"name"`
-    Price float64 `json:"price"`
 }
 ```
 
 2. Create the DTO: to transfer model with request and response payload
 
-Example: `internal/dto/product_dto.go`
+Example: `internal/dto/candidate_dto.go`
 
 ```go
 package dto
@@ -123,44 +122,37 @@ import (
 	"backend-election/internal/model"
 )
 
-type ProductCreateRequest struct {
+type AddcandidateRequest struct {
 	Name  string  `json:"name"`
-	Price float64 `json:"price"`
 }
 
-func (p *ProductCreateRequest) Validate() error {
+func (p *AddcandidateRequest) Validate() error {
 	if len(p.Name) == 0 {
 		return errors.New("name is required")
-	}
-	if p.Price <= 0 {
-		return errors.New("price must be greater than zero")
 	}
 	return nil
 }
 
-func (p *ProductCreateRequest) ToEntity() model.Product {
-	return model.Product{
+func (p *AddcandidateRequest) ToEntity() model.Candidate {
+	return model.Candidate{
 		Name:  p.Name,
-		Price: p.Price,
 	}
 }
 
-type ProductResponse struct {
+type CandidateResponse struct {
 	ID    int64   `json:"id"`
 	Name  string  `json:"name"`
-	Price float64 `json:"price"`
 }
 
-func (p *ProductResponse) FromEntity(product model.Product) {
-	p.ID = product.ID
-	p.Name = product.Name
-	p.Price = product.Price
+func (p *CandidateResponse) FromEntity(candidate model.Candidate) {
+	p.ID = candidate.ID
+	p.Name = candidate.Name
 }
 ```
 
 3. Create the Handler: Implement the handler functions in the internal/handler directory.
 
-Example: `internal/handler/product.go`
+Example: `internal/handler/candidate.go`
 
 ```go
 package handler
@@ -181,52 +173,50 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
-// Products handler
-type Products struct {
+// Candidates handler
+type Candidates struct {
 	Log *logger.Logger
 	DB  *sql.DB
 }
 
 // @Security Bearer
-// @Summary Create Product
-// @Description Create Product
-// @Tags Products
+// @Summary Add Candidate
+// @Description Add Candidate
+// @Tags Candidates
 // @Accept  json
 // @Produce  json
-// @Param product body dto.ProductCreateRequest true "Product to add"
+// @Param request body dto.AddCandidateRequest true "Candidate to add"
 // @Param Authorization header string true "Bearer token"
-// @Success 201 {object} dto.ProductResponse
-// @Router /products [post]
-func (h *Products) Create(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+// @Success 201 {object} dto.CandidateResponse
+// @Router /candidates [post]
+func (h *Candidates) Create(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var ctx = r.Context()
-	ctx, span := otel.Tracer(os.Getenv("APP_NAME")).Start(ctx, "CreateProductHandler")
-	defer span.End()
-
+	
 	defer r.Body.Close()
 	var httpres = httpresponse.Response{}
-	var productRequest dto.ProductCreateRequest
-	err := sonic.ConfigDefault.NewDecoder(r.Body).Decode(&productRequest)
+	var candidateRequest dto.AddCandidateRequest
+	err := sonic.ConfigDefault.NewDecoder(r.Body).Decode(&candidateRequest)
 	if err != nil {
-		h.Log.Error(ctx, err)
+		h.Log.Error(err)
 		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
 		return
 	}
 
-	if err := productRequest.Validate(); err != nil {
-		h.Log.Error(ctx, err)
+	if err := candidateRequest.Validate(); err != nil {
+		h.Log.Error(err)
 		http.Error(w, "Invalid input: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	var productRepo = repository.ProductRepository{Log: h.Log, Db: h.DB}
-	productRepo.ProductEntity = productRequest.ToEntity()
-	if err := productRepo.Save(ctx); err != nil {
+	var candidateRepo = repository.CandidateRepository{Log: h.Log, Db: h.DB}
+	candidateRepo.CandidteEntity = candidateRequest.ToEntity()
+	if err := candidateRepo.Save(ctx); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	var response dto.ProductResponse
-	response.FromEntity(productRepo.ProductEntity)
+	var response dto.CandidateResponse
+	response.FromEntity(candidateRepo.CandidateEntity)
 	httpres.SetMarshal(ctx, w, http.StatusCreated, response, "")
 }
 
@@ -234,7 +224,7 @@ func (h *Products) Create(w http.ResponseWriter, r *http.Request, _ httprouter.P
 
 4. Create Respository
 
-Example: `internal/repository/product_repository.go`
+Example: `internal/repository/candidate_repository.go`
 
 ```go
 package repository
@@ -245,14 +235,14 @@ import (
 	"backend-election/internal/model"
 )
 
-type ProductRepository struct {
+type CandidateRepository struct {
 	Log           *logger.Logger
 	Db            *sql.DB
-	ProductEntity model.Product
+	CandidateEntity model.Candidate
 }
 
-func (r *ProductRepository) Save(ctx context.Context) error {
-	// Implementasi simpan produk ke database
+func (r *CandidateRepository) Save(ctx context.Context) error {
+	// Implementasi simpan candidate ke database
 	return nil
 }
 ```
@@ -262,10 +252,10 @@ func (r *ProductRepository) Save(ctx context.Context) error {
 Example: `internal/route/route.go`
 
 ```go
-func ApiRoute(log *logger.Logger, db *database.Database, cache *redis.Cache, latencyMetric metric.Int64Histogram) *httprouter.Router {
+func ApiRoute(log *logger.Logger, db *database.Database, cache *redis.Cache) *httprouter.Router {
     // .... existing code
-    productHandler := handler.Products{Log: log, DB: db.Conn}
-    router.POST("/products", mid.WrapMiddleware(privateMiddlewares, productHandler.Create))
+    candidateHandler := handler.Candidates{Log: log, DB: db.Conn}
+    router.POST("/candidates", mid.WrapMiddleware(privateMiddlewares, candidateHandler.Create))
     // .... existing code
 }
 ```
@@ -285,15 +275,14 @@ When adding a new database migration for your product model, follow these steps 
 
 After the prefix, include a three-digit serial number followed by a descriptive name for the migration.
 
-2. Create a Migration for Products: For the products table, create a migration file in the migrations directory named `2.006_t_products.sql`.
+2. Create a Migration for Candidates: For the candidates table, create a migration file in the migrations directory named `2.006_t_candidates.sql`.
 
-Example: `migrations/2.006_t_products.sql`
+Example: `migrations/2.006_t_candidates.sql`
 
 ```sql
-CREATE TABLE products (
-    id int8 DEFAULT int64_id('products'::text, 'id'::text) NOT NULL,
+CREATE TABLE candidates (
+    id int8 DEFAULT int64_id('candidates'::text, 'id'::text) NOT NULL,
     name VARCHAR(255) NOT NULL,
-    price NUMERIC(10, 2) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NULL,
 );
 ```
@@ -314,9 +303,9 @@ $$ LANGUAGE plpgsql;
 Example seed file: `3.001_seed.sql`
 
 ```sql
-INSERT INTO products (name, price) VALUES
-('Sample Product', 19.99),
-('Another Product', 29.99);
+INSERT INTO candidates (name) VALUES
+('Alice'),
+('Bob');
 ```
 
 4. Running migration command using `go run cmd/main.go migrate`
@@ -332,4 +321,4 @@ go test ./...
 Contributions are welcome! Please fork the repository and submit a pull request for any enhancements or fixes.
 
 ## License
-This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+This project is licensed under GNU GPL V3 License. See the [LICENSE](./LICENSE) file for details.
