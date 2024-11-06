@@ -34,6 +34,7 @@ func ApiRoute(log *logger.Logger, db *database.Database, cache *redis.Cache) *ht
 	}
 	privateMiddlewares := append(publicMiddlewares, mid.Authentication, mid.Authorization)
 
+	pemilihHandler := handler.Pemilihs{Log: log, DB: db.Conn, Cache: cache}
 	userHandler := handler.Users{Log: log, DB: db.Conn, Cache: cache}
 	authHandler := handler.Auths{Log: log, DB: db.Conn}
 
@@ -43,6 +44,9 @@ func ApiRoute(log *logger.Logger, db *database.Database, cache *redis.Cache) *ht
 	router.POST("/users", mid.WrapMiddleware(privateMiddlewares, userHandler.Create))
 	router.PUT("/users/:id", mid.WrapMiddleware(privateMiddlewares, userHandler.Update))
 	router.DELETE("/users/:id", mid.WrapMiddleware(privateMiddlewares, userHandler.Delete))
+
+	// Pemilih
+	router.POST("/pemilih", mid.WrapMiddleware(privateMiddlewares, pemilihHandler.GetByPemilihId))
 
 	return router
 }
